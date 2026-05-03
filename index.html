@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>南极市场 · 股票分析平台</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .badge-group { display: flex; gap: 8px; align-items: center; }
+    .badge-link { font-size: 12px; color: #3498db; text-decoration: none; padding: 4px 10px; border: 1px solid #3498db; border-radius: 12px; transition: 0.2s; }
+    .badge-link:hover { background: #3498db; color: #fff; }
+    .real-time-badge { font-size: 12px; padding: 3px 8px; border-radius: 8px; margin-left: 8px; }
+    .badge-live { background: #e74c3c; color: #fff; }
+    .badge-local { background: #95a5a6; color: #fff; }
+    .info-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin: 10px 0; }
+    .info-item { background: #f8f9fa; padding: 10px; border-radius: 8px; text-align: center; }
+    .info-item .label { font-size: 12px; color: #7f8c8d; }
+    .info-item .value { font-size: 18px; font-weight: bold; margin-top: 4px; }
+    .value.up { color: #e74c3c; }
+    .value.down { color: #27ae60; }
+    .search-hint { font-size: 12px; color: #95a5a6; margin-top: 6px; text-align: center; }
+    .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #ecf0f1; border-top-color: #3498db; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .status-msg { text-align: center; padding: 20px; color: #7f8c8d; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1 class="logo">南极市场</h1>
+      <div class="badge-group">
+        <a class="badge-link" href="https://yindon2.github.io/IRTI/" target="_blank">IRTI人格测试</a>
+        <a class="badge-link" href="https://yindon2.github.io/penguin-genius/" target="_blank">企鹅奇才</a>
+        <span class="badge">yindon2</span>
+      </div>
+    </header>
+    <hr class="divider">
+
+    <div class="search-box" style="text-align:center;margin-bottom:20px;">
+      <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;">
+        <input type="text" id="stock-input" placeholder="输入股票代码，如 600519 或 000001" style="padding:12px 18px;font-size:16px;width:300px;border:2px solid #ddd;border-radius:10px;">
+        <button id="query-btn" class="btn-primary" style="padding:12px 24px;font-size:16px;background:#3498db;color:#fff;border:none;border-radius:10px;cursor:pointer;">查询</button>
+        <button id="similar-btn" class="btn-secondary" style="padding:12px 24px;font-size:16px;background:#2ecc71;color:#fff;border:none;border-radius:10px;cursor:pointer;">相似推荐</button>
+      </div>
+      <div class="search-hint">支持上海(6开头)和深圳(0/3开头)股票代码</div>
+    </div>
+
+    <div id="result-area"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

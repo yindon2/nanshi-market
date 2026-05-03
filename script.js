@@ -110,22 +110,26 @@ function calcMACD(close) {
 }
 
 function calcRSI(close, window = 14) {
-  const rsi = [null];
-  let gain = 0, loss = 0;
-  for (let i = 1; i < close.length; i++) {
+  const rsi = [];
+  let avgGain = 0, avgLoss = 0;
+  for (let i = 1; i <= window; i++) {
     const diff = close[i] - close[i-1];
-    if (diff > 0) gain += diff; else loss -= diff;
-    if (i === window) {
-      const avgGain = gain / window, avgLoss = loss / window;
-      rsi.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss));
-    } else if (i > window) {
-      const prevRSI = rsi[i-1];
-      const prevAvgGain = (close[i-1] - close[i-2] > 0 ? (close[i-1] - close[i-2]) : 0);
-      const prevAvgLoss = (close[i-1] - close[i-2] < 0 ? -(close[i-1] - close[i-2]) : 0);
-      const avgGain = (prevAvgGain * (window - 1) + (diff > 0 ? diff : 0)) / window;
-      const avgLoss = (prevAvgLoss * (window - 1) + (diff < 0 ? -diff : 0)) / window;
-      rsi.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss));
-    } else rsi.push(null);
+    if (diff > 0) avgGain += diff; else avgLoss -= diff;
+  }
+  avgGain /= window;
+  avgLoss /= window;
+  // indices 0..window-1 are null, index=window is first RSI
+  rsi.push(null);
+  for (let i = 1; i < window; i++) rsi.push(null);
+  rsi.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss));
+  // Subsequent values: smoothed moving average
+  for (let i = window + 1; i < close.length; i++) {
+    const diff = close[i] - close[i-1];
+    const gain = diff > 0 ? diff : 0;
+    const loss = diff < 0 ? -diff : 0;
+    avgGain = (avgGain * (window - 1) + gain) / window;
+    avgLoss = (avgLoss * (window - 1) + loss) / window;
+    rsi.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss));
   }
   return rsi;
 }
@@ -217,6 +221,7 @@ function renderKlineChart(klineData, code) {
   const ma5 = calcMA(closes, 5);
   const ma20 = calcMA(closes, 20);
   const macd = calcMACD(closes);
+  const rsi6 = calcRSI(closes, 6);
   const rsi14 = calcRSI(closes, 14);
   const boll = calcBollinger(closes);
 
@@ -233,7 +238,7 @@ function renderKlineChart(klineData, code) {
     </div>
   `;
 
-  return { html, data: { dates, closes, opens, highs, lows, volumes, ma5, ma20, macd, rsi14, boll } };
+  return { html, data: { dates, closes, opens, highs, lows, volumes, ma5, ma20, macd, rsi6, rsi14, boll } };
 }
 
 function initChart(containerId) {
@@ -260,18 +265,51 @@ function drawPriceChart(chart, data) {
   chart.setOption(option);
 }
 
+function findMACDCrossover(dif, dea) {
+  const golden = [], death = [];
+  for (let i = 1; i < dif.length; i++) {
+    if (dif[i] == null || dif[i-1] == null || dea[i] == null || dea[i-1] == null) continue;
+    if (dif[i-1] < dea[i-1] && dif[i] >= dea[i]) {
+      golden.push({ name: '金叉', xAxis: i, y: Math.min(dif[i], dea[i]) });
+    } else if (dif[i-1] > dea[i-1] && dif[i] <= dea[i]) {
+      death.push({ name: '死叉', xAxis: i, y: Math.min(dif[i], dea[i]) });
+    }
+  }
+  return { golden, death };
+}
+
 function drawMACDChart(chart, data) {
-  const colors = data.macd.macd.map(v => v >= 0 ? '#e74c3c' : '#27ae60');
+  const dif = data.macd.dif, dea = data.macd.dea;
+  const cross = findMACDCrossover(dif, dea);
   const option = {
     tooltip: { trigger: 'axis' },
-    legend: { data: ['DIF', 'DEA', 'MACD'] },
+    legend: { data: ['DIF', 'DEA', 'MACD', '金叉', '死叉'] },
     grid: { left: '8%', right: '8%', bottom: '10%' },
     xAxis: { type: 'category', data: data.dates, axisLabel: { rotate: 45, fontSize: 10 } },
     yAxis: { type: 'value' },
     series: [
       { name: 'MACD', type: 'bar', data: data.macd.macd, itemStyle: { color: params => params.value >= 0 ? '#e74c3c' : '#27ae60' } },
-      { name: 'DIF', type: 'line', data: data.macd.dif, smooth: true, lineStyle: { width: 1 }, itemStyle: { color: '#3498db' } },
-      { name: 'DEA', type: 'line', data: data.macd.dea, smooth: true, lineStyle: { width: 1 }, itemStyle: { color: '#f39c12' } }
+      {
+        name: 'DIF', type: 'line', data: dif, smooth: true,
+        lineStyle: { width: 1.5 }, itemStyle: { color: '#3498db' },
+        markPoint: {
+          data: [
+            ...cross.golden.map(p => ({
+              name: p.name, coord: [p.xAxis, p.y],
+              symbol: 'pin', symbolSize: 40,
+              itemStyle: { color: '#e74c3c' },
+              label: { formatter: '金叉', fontSize: 10, fontWeight: 'bold', color: '#fff' }
+            })),
+            ...cross.death.map(p => ({
+              name: p.name, coord: [p.xAxis, p.y],
+              symbol: 'pin', symbolSize: 40,
+              itemStyle: { color: '#27ae60' },
+              label: { formatter: '死叉', fontSize: 10, fontWeight: 'bold', color: '#fff' }
+            }))
+          ]
+        }
+      },
+      { name: 'DEA', type: 'line', data: dea, smooth: true, lineStyle: { width: 1 }, itemStyle: { color: '#f39c12' } }
     ]
   };
   chart.setOption(option);
@@ -280,11 +318,12 @@ function drawMACDChart(chart, data) {
 function drawRSIChart(chart, data) {
   const option = {
     tooltip: { trigger: 'axis' },
-    legend: { data: ['RSI14', '超买线(70)', '超卖线(30)'] },
+    legend: { data: ['RSI6', 'RSI14', '超买线(70)', '超卖线(30)'] },
     grid: { left: '8%', right: '8%', bottom: '10%' },
     xAxis: { type: 'category', data: data.dates, axisLabel: { rotate: 45, fontSize: 10 } },
     yAxis: { type: 'value', min: 0, max: 100 },
     series: [
+      { name: 'RSI6', type: 'line', data: data.rsi6, smooth: true, lineStyle: { width: 1.5 }, itemStyle: { color: '#e67e22' } },
       { name: 'RSI14', type: 'line', data: data.rsi14, smooth: true, lineStyle: { width: 2 }, itemStyle: { color: '#9b59b6' } },
       { name: '超买线(70)', type: 'line', data: data.dates.map(() => 70), lineStyle: { type: 'dashed' }, itemStyle: { color: '#e74c3c' }, symbol: 'none' },
       { name: '超卖线(30)', type: 'line', data: data.dates.map(() => 30), lineStyle: { type: 'dashed' }, itemStyle: { color: '#27ae60' }, symbol: 'none' }
